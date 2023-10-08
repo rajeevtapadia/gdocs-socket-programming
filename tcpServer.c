@@ -47,6 +47,8 @@ int main(){
 		printf("[-]Error in binding.\n");
 	}
 
+	int clientArr[10];
+	int clientCount = 0;
 
 	while(1){
 		newSocket = accept(sockfd, (struct sockaddr*)&newAddr, &addr_size);
@@ -54,6 +56,8 @@ int main(){
 			exit(1);
 		}
 		printf("Connection accepted from %s:%d\n", inet_ntoa(newAddr.sin_addr), ntohs(newAddr.sin_port));
+		clientArr[clientCount] = newSocket;
+		clientCount++;
 
 		if((childpid = fork()) == 0){
 			close(sockfd);
@@ -65,7 +69,9 @@ int main(){
 					break;
 				}else{
 					printf("Client: %s\n", buffer);
-					send(newSocket, buffer, strlen(buffer), 0);
+					for(int i = 0; i < clientCount; i++){
+						send(clientArr[i], buffer, strlen(buffer), 0);
+					}
 					bzero(buffer, sizeof(buffer));
 				}
 			}
