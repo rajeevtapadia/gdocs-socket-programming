@@ -17,7 +17,8 @@
 static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
 
-typedef struct {
+typedef struct
+{
     struct sockaddr_in address;
     int sockfd;
     int uid;
@@ -28,34 +29,42 @@ client_t *clients[MAX_CLIENTS];
 
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void str_overwrite_stdout() {
+void str_overwrite_stdout()
+{
     printf("\r%s", "> ");
     fflush(stdout);
 }
 
-void str_trim_lf(char *arr, int length) {
+void str_trim_lf(char *arr, int length)
+{
     int i;
-    for (i = 0; i < length; i++) {
-        if (arr[i] == '\n') {
+    for (i = 0; i < length; i++)
+    {
+        if (arr[i] == '\n')
+        {
             arr[i] = '\0';
             break;
         }
     }
 }
 
-void print_client_addr(struct sockaddr_in addr) {
+void print_client_addr(struct sockaddr_in addr)
+{
     printf("%d.%d.%d.%d",
-        addr.sin_addr.s_addr & 0xff,
-        (addr.sin_addr.s_addr & 0xff00) >> 8,
-        (addr.sin_addr.s_addr & 0xff0000) >> 16,
-        (addr.sin_addr.s_addr & 0xff000000) >> 24);
+           addr.sin_addr.s_addr & 0xff,
+           (addr.sin_addr.s_addr & 0xff00) >> 8,
+           (addr.sin_addr.s_addr & 0xff0000) >> 16,
+           (addr.sin_addr.s_addr & 0xff000000) >> 24);
 }
 
-void queue_add(client_t *cl) {
+void queue_add(client_t *cl)
+{
     pthread_mutex_lock(&clients_mutex);
 
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (!clients[i]) {
+    for (int i = 0; i < MAX_CLIENTS; ++i)
+    {
+        if (!clients[i])
+        {
             clients[i] = cl;
             break;
         }
@@ -64,23 +73,29 @@ void queue_add(client_t *cl) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void save_note_to_file(char *note) {
+void save_note_to_file(char *note)
+{
     FILE *file = fopen(NOTE_FILE, "a");
-    if (file == NULL) {
+    if (file == NULL)
+    {
         perror("ERROR: opening file");
         return;
     }
-    
+
     fprintf(file, "%s\n", note);
     fclose(file);
 }
 
-void queue_remove(int uid) {
+void queue_remove(int uid)
+{
     pthread_mutex_lock(&clients_mutex);
 
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i]) {
-            if (clients[i]->uid == uid) {
+    for (int i = 0; i < MAX_CLIENTS; ++i)
+    {
+        if (clients[i])
+        {
+            if (clients[i]->uid == uid)
+            {
                 clients[i] = NULL;
                 break;
             }
@@ -90,12 +105,16 @@ void queue_remove(int uid) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void send_message(char *s, int uid) {
+void send_message(char *s, int uid)
+{
     pthread_mutex_lock(&clients_mutex);
 
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i] && clients[i]->uid != uid) { // Check if the client exists and isn't the sender
-            if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
+    for (int i = 0; i < MAX_CLIENTS; ++i)
+    {
+        if (clients[i] && clients[i]->uid != uid)
+        { // Check if the client exists and isn't the sender
+            if (write(clients[i]->sockfd, s, strlen(s)) < 0)
+            {
                 perror("ERROR: write to descriptor failed");
                 break;
             }
@@ -105,7 +124,8 @@ void send_message(char *s, int uid) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void *handle_client(void *arg) {
+void *handle_client(void *arg)
+{
     char buff_out[BUFFER_SZ];
     char name[32];
     int leave_flag = 0;
@@ -113,10 +133,13 @@ void *handle_client(void *arg) {
     cli_count++;
     client_t *cli = (client_t *)arg;
 
-    if (recv(cli->sockfd, name, 32, 0) <= 0 || strlen(name) < 2 || strlen(name) >= 32 - 1) {
+    if (recv(cli->sockfd, name, 32, 0) <= 0 || strlen(name) < 2 || strlen(name) >= 32 - 1)
+    {
         printf("Couldn't set the Notes Platform username.\n");
         leave_flag = 1;
-    } else {
+    }
+    else
+    {
         strcpy(cli->name, name);
         sprintf(buff_out, "[%s] has joined the Notes Platform\n", cli->name);
         printf("%s", buff_out);
@@ -125,25 +148,33 @@ void *handle_client(void *arg) {
 
     bzero(buff_out, BUFFER_SZ);
 
-    while (1) {
-        if (leave_flag) {
+    while (1)
+    {
+        if (leave_flag)
+        {
             break;
         }
 
         int receive = recv(cli->sockfd, buff_out, BUFFER_SZ, 0);
-        if (receive > 0) {
-            if (strlen(buff_out) > 0) {
+        if (receive > 0)
+        {
+            if (strlen(buff_out) > 0)
+            {
                 save_note_to_file(buff_out);
 
                 str_trim_lf(buff_out, strlen(buff_out));
                 printf("[%s] posts a note: %s\n", cli->name, buff_out);
             }
-        } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
+        }
+        else if (receive == 0 || strcmp(buff_out, "exit") == 0)
+        {
             sprintf(buff_out, "[%s] has left the Notes Platform\n", cli->name);
             printf("%s", buff_out);
             send_message(buff_out, cli->uid);
             leave_flag = 1;
-        } else {
+        }
+        else
+        {
             printf("ERROR: -1\n");
             leave_flag = 1;
         }
@@ -160,13 +191,15 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
-int main(int argc, char **argv) {
-    if (argc != 2) {
+int main(int argc, char **argv)
+{
+    if (argc != 2)
+    {
         printf("Usage: %s <port>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    char *ip = "127.0.0.1";
+    char *ip = "192.168.1.16";
     int port = atoi(argv[1]);
     int option = 1;
     int listenfd = 0, connfd = 0;
@@ -181,28 +214,33 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    if (setsockopt(listenfd, SOL_SOCKET, (SO_REUSEPORT | SO_REUSEADDR), (char *)&option, sizeof(option)) < 0) {
+    if (setsockopt(listenfd, SOL_SOCKET, (SO_REUSEPORT | SO_REUSEADDR), (char *)&option, sizeof(option)) < 0)
+    {
         perror("ERROR: setsockopt failed");
         return EXIT_FAILURE;
     }
 
-    if (bind(listenfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (bind(listenfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
         perror("ERROR: Socket binding failed");
         return EXIT_FAILURE;
     }
 
-    if (listen(listenfd, 10) < 0) {
+    if (listen(listenfd, 10) < 0)
+    {
         perror("ERROR: Socket listening failed");
         return EXIT_FAILURE;
     }
 
     printf("=== WELCOME TO THE NOTES PLATFORM ===\n");
 
-    while (1) {
+    while (1)
+    {
         socklen_t clilen = sizeof(cli_addr);
         connfd = accept(listenfd, (struct sockaddr *)&cli_addr, &clilen);
 
-        if ((cli_count + 1) == MAX_CLIENTS) {
+        if ((cli_count + 1) == MAX_CLIENTS)
+        {
             printf("Maximum number of Notes Platform members reached. Rejected: ");
             print_client_addr(cli_addr);
             printf(":%d\n", cli_addr.sin_port);
